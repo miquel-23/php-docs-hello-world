@@ -81,7 +81,7 @@ try {
     if (empty($blobs)) {
         echo "<p style='color:orange;'>No s'han trobat fitxers al contenidor '$containerName'.</p>";
     }
-    echo "<p>Nombre de blobs trobats: " . count($blobs) . "</p>";
+    echo "<p>* Nombre de blobs trobats: " . count($blobs) . "</p>";
 
 } catch (ServiceException $e) {
     die("Error al listar archivos: " . $e->getMessage());
