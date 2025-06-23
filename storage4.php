@@ -1,4 +1,9 @@
 <?php
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+
 require __DIR__ . '/vendor/autoload.php';
 
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
@@ -90,6 +95,15 @@ function generateBlobSasUrl($accountName, $containerName, $blobName, $sasHelper)
 <body>
     <h1>Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
     <ul>
+
+<?php
+if (!empty($blobs)) {
+    $primerBlob = $blobs[0]->getName();
+    $sasTest = generateBlobSasUrl($accountName, $containerName, $primerBlob, $sasHelper);
+    echo "<p>Prova d'enllaç SAS per al primer blob: <a href='$sasTest' target='_blank'>$primerBlob</a></p>";
+}
+?>
+        
         <?php foreach ($blobs as $blob): ?>
             <?php
                 $blobName = $blob->getName();
