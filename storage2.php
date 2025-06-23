@@ -80,7 +80,7 @@ try {
     <title>Gestor de archivos ZIP en Azure Blob</title>
 </head>
 <body>
-    <h1>Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
+    <h1>NOU! Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
     <ul>
         <?php foreach ($blobs as $blob): ?>
             <li>
