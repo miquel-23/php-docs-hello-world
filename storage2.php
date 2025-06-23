@@ -4,36 +4,19 @@ require 'vendor/autoload.php';
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions;
 use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
-
-// Nou
-
-use MicrosoftAzure\Storage\Blob\Models\CreateBlobOptions;
-use MicrosoftAzure\Storage\Blob\Models\BlobSasPermissions;
 use MicrosoftAzure\Storage\Common\Models\SharedAccessSignatureHelper;
 
+// Configuración
+$connectionString = getenv("AZURE_STORAGE_CONNECTION_STRING");
+$containerName = "comprimidos";
+
+$blobClient = BlobRestProxy::createBlobService($connectionString);
+
+// SAS Helper per generar enllaços amb SAS
 $sasHelper = new SharedAccessSignatureHelper(
     getenv('AZURE_STORAGE_ACCOUNT'),
     getenv('AZURE_STORAGE_KEY')
 );
-
-$blobName = $blob->getName();
-$sasToken = $sasHelper->generateBlobServiceSharedAccessSignatureToken(
-    'b',             // Resource type (blob)
-    $containerName . '/' . $blobName,
-    'r',             // Permissions: read
-    (new \DateTime())->format('Y-m-d\TH:i:s\Z'),
-    (new \DateTime('+1 hour'))->format('Y-m-d\TH:i:s\Z')
-);
-
-$url = $blob->getUrl() . '?' . $sasToken;
-
-// Nou
-
-// Configuración
-$connectionString = getenv("AZURE_STORAGE_CONNECTION_STRING");
-$containerName = "comprimidos";  // Cambia esto por el nombre de tu contenedor
-
-$blobClient = BlobRestProxy::createBlobService($connectionString);
 
 // Eliminar archivo si se solicita
 if (isset($_GET['delete'])) {
@@ -80,14 +63,25 @@ try {
     <title>Gestor de archivos ZIP en Azure Blob</title>
 </head>
 <body>
-    <h1>NOU! Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
+    <h1>Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
     <ul>
         <?php foreach ($blobs as $blob): ?>
+            <?php
+                $blobName = $blob->getName();
+                $sasToken = $sasHelper->generateBlobServiceSharedAccessSignatureToken(
+                    'b',
+                    $containerName . '/' . $blobName,
+                    'r',
+                    (new DateTime())->format('Y-m-d\TH:i:s\Z'),
+                    (new DateTime('+1 hour'))->format('Y-m-d\TH:i:s\Z')
+                );
+                $urlConSAS = $blob->getUrl() . '?' . $sasToken;
+            ?>
             <li>
-                <a href="<?= htmlspecialchars($url) ?>" target="_blank">
-                    <?= htmlspecialchars($blob->getName()) ?>
+                <a href="<?= htmlspecialchars($urlConSAS) ?>" target="_blank">
+                    <?= htmlspecialchars($blobName) ?>
                 </a>
-                [<a href="?delete=<?= urlencode($blob->getName()) ?>" onclick="return confirm('¿Eliminar este archivo?')">Eliminar</a>]
+                [<a href="?delete=<?= urlencode($blobName) ?>" onclick="return confirm('¿Eliminar este archivo?')">Eliminar</a>]
             </li>
         <?php endforeach; ?>
     </ul>
