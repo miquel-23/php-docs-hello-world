@@ -123,11 +123,35 @@ try {
         ?>
         <?php foreach ($blobs as $blob): ?>
             <li>
-                <a href="<?= htmlspecialchars(
+               <!-- <a href="<?= htmlspecialchars(
                     $blob->getUrl()
                 ) ?>" target="_blank">
                     <?= htmlspecialchars($blob->getName()) ?>
-                </a>
+                </a> -->
+
+<?php
+    $blobName = $blob->getName();
+
+    // Generar SAS per accedir al blob durant 1 hora
+    $sasToken = $sasHelper->generateBlobServiceSharedAccessSignatureToken(
+        'b', // tipus: blob
+        $containerName . '/' . $blobName,
+        'r', // permisos: read
+        (new \DateTime())->format('Y-m-d\TH:i:s\Z'),           // Inici: ara
+        (new \DateTime('+1 hour'))->format('Y-m-d\TH:i:s\Z')   // Fi: en 1 hora
+    );
+
+    $urlConSAS = $blob->getUrl() . '?' . $sasToken;
+?>
+
+<li>
+    <a href="<?= htmlspecialchars($urlConSAS) ?>" target="_blank">
+        <?= htmlspecialchars($blobName) ?>
+    </a>
+    [<a href="?delete=<?= urlencode($blobName) ?>" onclick="return confirm('¿Eliminar este archivo?')">Eliminar</a>]
+</li>
+
+                
                 [<a href="?delete=<?= urlencode(
                     $blob->getName()
                 ) ?>" onclick="return confirm('¿Eliminar este archivo?')">Eliminar</a>]
