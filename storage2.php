@@ -84,7 +84,7 @@ try {
     <ul>
         <?php foreach ($blobs as $blob): ?>
             <li>
-                <a href="<?= htmlspecialchars($blob->getUrl() . '?' . $sasToken) ?>" target="_blank">
+                <a href="<?= htmlspecialchars($url) ?>" target="_blank">
                     <?= htmlspecialchars($blob->getName()) ?>
                 </a>
                 [<a href="?delete=<?= urlencode($blob->getName()) ?>" onclick="return confirm('¿Eliminar este archivo?')">Eliminar</a>]
