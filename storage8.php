@@ -10,65 +10,65 @@ use MicrosoftAzure\Storage\Common\SharedAccessSignatureHelper;
 $connectionString = getenv("AZURE_STORAGE_CONNECTION_STRING");
 $containerName = "comprimidos";
 
-// Crear client
+// Connexió
 $blobClient = BlobRestProxy::createBlobService($connectionString);
 
 // Extreure AccountName i AccountKey
-preg_match("/AccountName=([^;]+)/", $connectionString, $m1);
-preg_match("/AccountKey=([^;]+)/", $connectionString, $m2);
-$accountName = $m1[1];
-$accountKey = $m2[1];
+preg_match("/AccountName=([^;]+)/", $connectionString, $match1);
+preg_match("/AccountKey=([^;]+)/", $connectionString, $match2);
+$accountName = $match1[1] ?? null;
+$accountKey = $match2[1] ?? null;
 
-// Crear helper SAS
+if (!$accountName || !$accountKey) {
+    die("No s'han pogut extreure AccountName o AccountKey.");
+}
+
 $sasHelper = new SharedAccessSignatureHelper($accountName, $accountKey);
 
-// Listar blobs
+// Obtenir blobs
 try {
     $listOptions = new ListBlobsOptions();
-    $blobList = $blobClient->listBlobs($containerName, $listOptions);
-    $blobs = $blobList->getBlobs();
+    $result = $blobClient->listBlobs($containerName, $listOptions);
+    $blobs = $result->getBlobs();
 } catch (ServiceException $e) {
-    die("Error al listar blobs: " . $e->getMessage());
+    die("Error al llistar blobs: " . $e->getMessage());
 }
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Gestor de archivos ZIP en Azure Blob</title>
+    <meta charset="utf-8">
+    <title>Azure Blob - Descàrrega ZIP</title>
 </head>
 <body>
     <h1>Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
+    <?php if (empty($blobs)): ?>
+        <p>No hi ha cap fitxer.</p>
+    <?php else: ?>
+        <ul>
+            <?php foreach ($blobs as $blob): 
+                $blobName = $blob->getName();
+                $expiry = gmdate('Y-m-d\TH:i:s\Z', time() + 600); // 10 minuts
+                $resourcePath = "$containerName/$blobName";
 
-    <ul>
-        <?php foreach ($blobs as $blob): 
-            $blobName = $blob->getName();
+                // Generar SAS token
+                $sasToken = $sasHelper->generateBlobServiceSharedAccessSignatureToken(
+                    'b', // Tipus 'blob'
+                    $resourcePath,
+                    'r', // Lectura
+                    $expiry
+                );
 
-            // Crear URL SAS
-            $expiry = gmdate('Y-m-d\TH:i:s\Z', strtotime('+10 minutes'));
-            $resourcePath = $containerName . '/' . $blobName;
-
-            $sasToken = $sasHelper->generateBlobServiceSharedAccessSignatureToken(
-                'b',               // 'b' = blob
-                $resourcePath,    // container/blob
-                'r',              // permisos de lectura
-                $expiry
-            );
-
-            $sasUrl = sprintf(
-                "https://%s.blob.core.windows.net/%s/%s?%s",
-                $accountName,
-                $containerName,
-                rawurlencode($blobName),
-                $sasToken
-            );
-        ?>
-            <li>
-                <a href="<?= htmlspecialchars($sasUrl) ?>" target="_blank">
-                    <?= htmlspecialchars($blobName) ?>
-                </a>
-            </li>
-        <?php endforeach; ?>
-    </ul>
+                $sasUrl = "https://{$accountName}.blob.core.windows.net/{$containerName}/" . rawurlencode($blobName) . "?$sasToken";
+            ?>
+                <li>
+                    <a href="<?= htmlspecialchars($sasUrl) ?>" target="_blank">
+                        <?= htmlspecialchars($blobName) ?>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
 </body>
 </html>
