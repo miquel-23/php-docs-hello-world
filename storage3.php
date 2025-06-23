@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
 require __DIR__ . '/vendor/autoload.php';
 
@@ -74,6 +77,11 @@ try {
     $listOptions = new ListBlobsOptions();
     $blobList = $blobClient->listBlobs($containerName, $listOptions);
     $blobs = $blobList->getBlobs();
+    if (empty($blobs)) {
+        echo "<p style='color:orange;'>No s'han trobat fitxers al contenidor '$containerName'.</p>";
+    }
+    echo "<p>Nombre de blobs trobats: " . count($blobs) . "</p>";
+
 } catch (ServiceException $e) {
     die("Error al listar archivos: " . $e->getMessage());
 }
