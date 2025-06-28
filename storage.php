@@ -1,71 +1,104 @@
 <?php
+
 require 'vendor/autoload.php';
 
 use MicrosoftAzure\Storage\Blob\BlobRestProxy;
 use MicrosoftAzure\Storage\Blob\Models\ListBlobsOptions;
-use MicrosoftAzure\Storage\Common\Exceptions\ServiceException;
+
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
 // Configuración
 $connectionString = getenv("AZURE_STORAGE_CONNECTION_STRING");
-$containerName = "comprimidos";  // Cambia esto por el nombre de tu contenedor
+$containerName = "comprimidos";
+
+if (!$connectionString) {
+    die("La variable AZURE_STORAGE_CONNECTION_STRING no está configurada.");
+}
 
 $blobClient = BlobRestProxy::createBlobService($connectionString);
 
-// Eliminar archivo si se solicita
-if (isset($_GET['delete'])) {
-    $blobToDelete = $_GET['delete'];
+// Descargar archivo si se solicita
+if (isset($_GET['download_blob'])) {
+    $blobName = $_GET['download_blob'];
     try {
-        $blobClient->deleteBlob($containerName, $blobToDelete);
-        echo "<p style='color:green;'>Archivo $blobToDelete eliminado correctamente.</p>";
-    } catch (ServiceException $e) {
-        echo "<p style='color:red;'>Error al eliminar: " . $e->getMessage() . "</p>";
+        $blob = $blobClient->getBlob($containerName, $blobName);
+        $content = stream_get_contents($blob->getContentStream());
+
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . basename($blobName) . '"');
+        header('Content-Length: ' . strlen($content));
+
+        echo $content;
+        exit;
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo "Error al descargar el archivo: " . $e->getMessage();
+        exit;
     }
 }
 
-// Subida de archivo ZIP
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_FILES["zipfile"])) {
-    $uploadedFile = $_FILES["zipfile"];
-    if ($uploadedFile["type"] !== "application/zip") {
-        echo "<p style='color:red;'>Solo se permiten archivos ZIP.</p>";
-    } else {
-        $blobName = basename($uploadedFile["name"]);
-        $content = fopen($uploadedFile["tmp_name"], "r");
+// Eliminar archivo si se envió solicitud
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_blob'])) {
+    try {
+        $blobClient->deleteBlob($containerName, $_POST['delete_blob']);
+        echo "<p style='color:green;'>Archivo eliminado: {$_POST['delete_blob']}</p>";
+    } catch (Exception $e) {
+        echo "<p style='color:red;'>Error al eliminar: {$e->getMessage()}</p>";
+    }
+}
 
+// Subir archivo nuevo
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['zipfile'])) {
+    $file = $_FILES['zipfile'];
+    if ($file['error'] === UPLOAD_ERR_OK && mime_content_type($file['tmp_name']) === 'application/zip') {
+        $blobName = basename($file['name']);
         try {
+            $content = fopen($file['tmp_name'], 'r');
             $blobClient->createBlockBlob($containerName, $blobName, $content);
-            echo "<p style='color:green;'>Archivo $blobName subido correctamente.</p>";
-        } catch (ServiceException $e) {
-            echo "<p style='color:red;'>Error al subir: " . $e->getMessage() . "</p>";
+            echo "<p style='color:green;'>Archivo subido: {$blobName}</p>";
+        } catch (Exception $e) {
+            echo "<p style='color:red;'>Error al subir: {$e->getMessage()}</p>";
         }
+    } else {
+        echo "<p style='color:red;'>Solo se permiten archivos .zip válidos.</p>";
     }
 }
 
-// Listar archivos
+// Listar blobs
 try {
-    $listOptions = new ListBlobsOptions();
-    $blobList = $blobClient->listBlobs($containerName, $listOptions);
+    $blobList = $blobClient->listBlobs($containerName, new ListBlobsOptions());
     $blobs = $blobList->getBlobs();
-} catch (ServiceException $e) {
-    die("Error al listar archivos: " . $e->getMessage());
+} catch (Exception $e) {
+    die("Error al listar blobs: " . $e->getMessage());
 }
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+    <meta charset="UTF-8">
     <title>Gestor de archivos ZIP en Azure Blob</title>
 </head>
 <body>
-    <h1>Archivos ZIP en el contenedor '<?= htmlspecialchars($containerName) ?>'</h1>
+    <h1>Archivos ZIP en '<?= htmlspecialchars($containerName) ?>'</h1>
+
     <ul>
+    <?php if (empty($blobs)): ?>
+        <li>No hay archivos ZIP.</li>
+    <?php else: ?>
         <?php foreach ($blobs as $blob): ?>
             <li>
-                <a href="<?= htmlspecialchars($blob->getUrl()) ?>" target="_blank">
+                <a href="?download_blob=<?= urlencode($blob->getName()) ?>" target="_blank">
                     <?= htmlspecialchars($blob->getName()) ?>
                 </a>
-                [<a href="?delete=<?= urlencode($blob->getName()) ?>" onclick="return confirm('¿Eliminar este archivo?')">Eliminar</a>]
+                <form method="POST" style="display:inline;" onsubmit="return confirm('¿Eliminar <?= htmlspecialchars($blob->getName()) ?>?')">
+                    <input type="hidden" name="delete_blob" value="<?= htmlspecialchars($blob->getName()) ?>">
+                    <button type="submit" style="color:red;">Eliminar</button>
+                </form>
             </li>
         <?php endforeach; ?>
+    <?php endif; ?>
     </ul>
 
     <h2>Subir nuevo archivo ZIP</h2>
